@@ -209,7 +209,7 @@ async function main() {
     const result = await callWithRetry(client, to);
     results.push(result);
 
-    // Pretty-print result with colour coding
+    // Pretty-print result with color coding
     const icon =
       result.status === 'completed' ? '✅' :
       result.status === 'no-answer' ? '📵' :
