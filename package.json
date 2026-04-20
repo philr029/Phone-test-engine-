@@ -1,0 +1,15 @@
+{
+  "name": "phone-test-engine",
+  "version": "1.0.0",
+  "description": "Automated phone test engine using Twilio and GitHub Actions",
+  "main": "call.js",
+  "scripts": {
+    "start": "node call.js"
+  },
+  "keywords": ["twilio", "phone", "automation"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "twilio": "^5.3.7"
+  }
+}

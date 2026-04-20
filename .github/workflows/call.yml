@@ -1,0 +1,42 @@
+name: Phone Test Engine
+
+on:
+  # Allow manual trigger from the GitHub Actions UI
+  workflow_dispatch:
+
+  # Run automatically every day at 9:00 AM UTC
+  schedule:
+    - cron: '0 9 * * *'
+
+jobs:
+  call-numbers:
+    name: Call Phone Numbers
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run Phone Test Engine
+        env:
+          TWILIO_SID:    ${{ secrets.TWILIO_SID }}
+          TWILIO_AUTH:   ${{ secrets.TWILIO_AUTH }}
+          TWILIO_NUMBER: ${{ secrets.TWILIO_NUMBER }}
+        run: node call.js
+
+      - name: Upload call logs as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: call-logs-${{ github.run_id }}
+          path: logs.json
+          retention-days: 30
