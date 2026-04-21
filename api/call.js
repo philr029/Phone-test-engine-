@@ -29,7 +29,7 @@ const AUTH_TOKEN  = process.env.TWILIO_AUTH_TOKEN  || process.env.TWILIO_AUTH;
 const FROM_NUMBER = process.env.TWILIO_PHONE_NUMBER || process.env.TWILIO_NUMBER;
 
 // How long to wait for a terminal webhook status before declaring timeout (ms)
-const DEFAULT_POLL_TIMEOUT_MS  = 90_000;
+const DEFAULT_WEBHOOK_TIMEOUT_MS   = 90_000;
 
 // Default delay between consecutive calls (ms) — avoids spam/rate-limit flags
 const DEFAULT_CALL_DELAY_MS    = 3_000;
@@ -207,7 +207,7 @@ async function startCalls(numbers, options = {}) {
   } = options;
 
   const webhookUrl = baseUrl ? `${baseUrl.replace(/\/$/, '')}/api/webhook` : '';
-  const timeoutMs  = DEFAULT_POLL_TIMEOUT_MS;
+  const timeoutMs  = DEFAULT_WEBHOOK_TIMEOUT_MS;
 
   // Validate Twilio credentials when not in test mode
   let client = null;
