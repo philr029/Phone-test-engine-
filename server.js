@@ -23,6 +23,7 @@
 require('dotenv').config();
 
 const express    = require('express');
+const cors       = require('cors');
 const path       = require('path');
 const fs         = require('fs');
 
@@ -30,6 +31,10 @@ const { startCalls }               = require('./api/call');
 const webhookRouter                = require('./api/webhook');
 const { readResults, exportCsv }   = require('./api/results');
 const rateLimit                    = require('express-rate-limit');
+
+const validateRouter  = require('./src/routes/validate');
+const testCallRouter  = require('./src/routes/testCall');
+const logsRouter      = require('./src/routes/logs');
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
@@ -47,13 +52,19 @@ const startTestLimiter = rateLimit({
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 
-// Parse JSON request bodies (used by /start-test)
+// CORS — allow all origins (tighten in production as needed)
+app.use(cors());
+
+// Parse JSON request bodies (used by /start-test and /validate etc.)
 app.use(express.json());
 
 // Parse URL-encoded bodies (used by Twilio webhook POSTs)
 app.use(express.urlencoded({ extended: false }));
 
-// Serve static frontend files from /frontend
+// Serve the new public dashboard (takes priority over legacy /frontend)
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Serve legacy frontend files from /frontend as well
 app.use(express.static(path.join(__dirname, 'frontend')));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
