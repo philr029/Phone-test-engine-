@@ -174,6 +174,19 @@
     // ── Init ─────────────────────────────────────────────────────────────────
     fetchResults();
 
+    // ── Security helpers ─────────────────────────────────────────────────────
+
+    /** Escape a string so it is safe to embed inside innerHTML. */
+    function escHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     function fmtTime(iso) {
@@ -243,28 +256,27 @@
       const tbody = document.getElementById('results-tbody');
 
       if (rows.length === 0) {
-        tbody.innerHTML = `
-          <tr id="empty-row">
-            <td colspan="7" class="px-4 py-10 text-center text-gray-400">
-              No results ${filter ? `with status "${filter}"` : 'yet — start a test run above.'}.
-            </td>
-          </tr>`;
+        const msg = filter
+          ? `No results with status "${escHtml(filter)}".`
+          : 'No results yet — start a test run above.';
+        tbody.innerHTML =
+          `<tr id="empty-row"><td colspan="7" class="px-4 py-10 text-center text-gray-400">${msg}</td></tr>`;
         return;
       }
 
       tbody.innerHTML = rows.map(r => `
         <tr class="hover:bg-gray-50 transition">
-          <td class="px-4 py-3 font-mono font-medium">${r.to}</td>
+          <td class="px-4 py-3 font-mono font-medium">${escHtml(r.to)}</td>
           <td class="px-4 py-3">${statusBadge(r.status)}</td>
-          <td class="px-4 py-3 text-gray-500">${fmtTime(r.startTime)}</td>
-          <td class="px-4 py-3">${fmtDuration(r.duration)}</td>
-          <td class="px-4 py-3 text-center">${r.attempts || '—'}</td>
+          <td class="px-4 py-3 text-gray-500">${escHtml(fmtTime(r.startTime))}</td>
+          <td class="px-4 py-3">${escHtml(fmtDuration(r.duration))}</td>
+          <td class="px-4 py-3 text-center">${escHtml(String(r.attempts || '—'))}</td>
           <td class="px-4 py-3">
             ${r.testMode
               ? '<span class="text-xs text-purple-600 font-medium">test</span>'
               : '<span class="text-xs text-gray-400">live</span>'}
           </td>
-          <td class="px-4 py-3 font-mono text-xs text-gray-400 truncate max-w-xs" title="${r.callSid || ''}">${r.callSid || '—'}</td>
+          <td class="px-4 py-3 font-mono text-xs text-gray-400 truncate max-w-xs" title="${escHtml(r.callSid || '')}">${escHtml(r.callSid || '—')}</td>
         </tr>`).join('');
     }
 

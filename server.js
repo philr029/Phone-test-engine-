@@ -33,6 +33,37 @@ const { readResults, exportCsv }   = require('./api/results');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
+// ── Simple in-memory rate limiter ─────────────────────────────────────────────
+
+// Limits /start-test to MAX_REQUESTS calls per WINDOW_MS per IP address.
+const RATE_LIMIT_WINDOW_MS  = 60_000; // 1 minute
+const RATE_LIMIT_MAX        = 10;     // max requests per window
+
+const rateLimitStore = new Map(); // ip → { count, resetAt }
+
+function rateLimit(req, res, next) {
+  const ip  = req.ip || req.connection.remoteAddress || 'unknown';
+  const now = Date.now();
+  let entry = rateLimitStore.get(ip);
+
+  if (!entry || now > entry.resetAt) {
+    entry = { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS };
+    rateLimitStore.set(ip, entry);
+  }
+
+  entry.count += 1;
+
+  if (entry.count > RATE_LIMIT_MAX) {
+    const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+    res.set('Retry-After', String(retryAfter));
+    return res.status(429).json({
+      error: `Too many requests. Please retry after ${retryAfter} seconds.`,
+    });
+  }
+
+  next();
+}
+
 // ── Middleware ────────────────────────────────────────────────────────────────
 
 // Parse JSON request bodies (used by /start-test)
@@ -58,7 +89,7 @@ app.use(express.static(path.join(__dirname, 'frontend')));
  *
  * Response: { message, count, scheduledAt? }
  */
-app.post('/start-test', async (req, res) => {
+app.post('/start-test', rateLimit, async (req, res) => {
   try {
     let { numbers, testMode, retries, scheduledAt } = req.body || {};
 
