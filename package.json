@@ -4,12 +4,21 @@
   "description": "Automated phone test engine using Twilio and GitHub Actions",
   "main": "call.js",
   "scripts": {
-    "start": "node call.js"
+    "start": "node server.js",
+    "start:cli": "node call.js",
+    "server": "node server.js"
   },
-  "keywords": ["twilio", "phone", "automation"],
+  "keywords": [
+    "twilio",
+    "phone",
+    "automation"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "twilio": "^5.3.7"
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "twilio": "^5.3.7",
+    "uuid": "^9.0.1"
   }
 }
