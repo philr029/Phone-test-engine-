@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Phone Test Engine — Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Status badge colours */
+    .badge-completed  { @apply bg-green-100  text-green-800; }
+    .badge-no-answer  { @apply bg-yellow-100 text-yellow-800; }
+    .badge-busy       { @apply bg-orange-100 text-orange-800; }
+    .badge-failed     { @apply bg-red-100    text-red-800; }
+    .badge-canceled   { @apply bg-gray-100   text-gray-700; }
+    .badge-initiated  { @apply bg-blue-100   text-blue-800; }
+    .badge-ringing    { @apply bg-indigo-100 text-indigo-800; }
+    .badge-in-progress { @apply bg-purple-100 text-purple-800; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans text-gray-800">
+
+  <!-- Header -->
+  <header class="bg-white shadow-sm">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">📞</span>
+        <h1 class="text-xl font-bold tracking-tight">Phone Test Engine</h1>
+      </div>
+      <span id="auto-refresh-indicator"
+            class="text-xs text-gray-400 hidden">
+        ⟳ Auto-refreshing…
+      </span>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-8 space-y-8">
+
+    <!-- Control Panel -->
+    <section class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <h2 class="text-lg font-semibold mb-4">Start Test Run</h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+        <!-- Numbers input -->
+        <div class="md:col-span-2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Phone Numbers
+            <span class="text-gray-400 font-normal">
+              (one per line, E.164 format — leave blank to use numbers.json)
+            </span>
+          </label>
+          <textarea id="numbers-input" rows="4"
+            placeholder="+15005550006&#10;+15005550001"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono">
+          </textarea>
+        </div>
+
+        <!-- Retries -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Max Retries
+          </label>
+          <input id="retries-input" type="number" min="0" max="5" value="1"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+
+        <!-- Scheduled at -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Schedule At
+            <span class="text-gray-400 font-normal">(leave blank to run immediately)</span>
+          </label>
+          <input id="schedule-input" type="datetime-local"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+
+        <!-- Test mode toggle -->
+        <div class="flex items-center gap-3">
+          <input id="test-mode-toggle" type="checkbox"
+            class="w-4 h-4 rounded accent-blue-600" />
+          <label for="test-mode-toggle" class="text-sm text-gray-700">
+            Test Mode
+            <span class="text-gray-400">
+              — simulate calls, no real Twilio API usage
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="mt-5 flex flex-wrap gap-3">
+        <button id="start-btn" onclick="startTest()"
+          class="px-5 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg
+                 hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+          ▶ Start Test
+        </button>
+        <button onclick="exportCsv()"
+          class="px-5 py-2 bg-white border border-gray-300 text-sm font-semibold
+                 rounded-lg hover:bg-gray-50 transition">
+          ⬇ Export CSV
+        </button>
+        <button onclick="clearTable()"
+          class="px-5 py-2 bg-white border border-gray-300 text-sm text-gray-600
+                 rounded-lg hover:bg-gray-50 transition">
+          Clear view
+        </button>
+      </div>
+
+      <!-- Status message -->
+      <p id="status-msg" class="mt-3 text-sm hidden"></p>
+    </section>
+
+    <!-- Summary cards -->
+    <section id="summary-cards" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 hidden">
+      <!-- Injected dynamically -->
+    </section>
+
+    <!-- Results table -->
+    <section class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Call Results</h2>
+        <div class="flex items-center gap-3">
+          <!-- Status filter -->
+          <select id="filter-status" onchange="applyFilter()"
+            class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm
+                   focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="">All statuses</option>
+            <option value="completed">completed</option>
+            <option value="no-answer">no-answer</option>
+            <option value="busy">busy</option>
+            <option value="failed">failed</option>
+            <option value="canceled">canceled</option>
+            <option value="initiated">initiated</option>
+          </select>
+          <span id="result-count" class="text-sm text-gray-500"></span>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+            <tr>
+              <th class="px-4 py-3 text-left">Phone Number</th>
+              <th class="px-4 py-3 text-left">Status</th>
+              <th class="px-4 py-3 text-left">Start Time</th>
+              <th class="px-4 py-3 text-left">Duration</th>
+              <th class="px-4 py-3 text-left">Attempts</th>
+              <th class="px-4 py-3 text-left">Mode</th>
+              <th class="px-4 py-3 text-left">Call SID</th>
+            </tr>
+          </thead>
+          <tbody id="results-tbody" class="divide-y divide-gray-100">
+            <tr id="empty-row">
+              <td colspan="7" class="px-4 py-10 text-center text-gray-400">
+                No results yet — start a test run above.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // ── State ────────────────────────────────────────────────────────────────
+    let allResults     = [];
+    let autoRefreshId  = null;
+    const REFRESH_MS   = 4000; // poll interval while a run is active
+
+    // ── Init ─────────────────────────────────────────────────────────────────
+    fetchResults();
+
+    // ── Security helpers ─────────────────────────────────────────────────────
+
+    /** Escape a string so it is safe to embed inside innerHTML. */
+    function escHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    function fmtTime(iso) {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleString();
+    }
+
+    function fmtDuration(secs) {
+      if (!secs) return '—';
+      return secs < 60
+        ? `${secs}s`
+        : `${Math.floor(secs / 60)}m ${secs % 60}s`;
+    }
+
+    function statusBadge(status) {
+      const cls = {
+        completed:   'bg-green-100 text-green-800',
+        'no-answer': 'bg-yellow-100 text-yellow-800',
+        busy:        'bg-orange-100 text-orange-800',
+        failed:      'bg-red-100 text-red-800',
+        canceled:    'bg-gray-100 text-gray-700',
+        initiated:   'bg-blue-100 text-blue-800',
+        ringing:     'bg-indigo-100 text-indigo-800',
+        'in-progress': 'bg-purple-100 text-purple-800',
+      }[status] || 'bg-gray-100 text-gray-600';
+      return `<span class="px-2 py-0.5 rounded-full text-xs font-medium ${cls}">${status}</span>`;
+    }
+
+    function showStatus(msg, type = 'info') {
+      const el = document.getElementById('status-msg');
+      const colors = { info: 'text-blue-600', success: 'text-green-600', error: 'text-red-600' };
+      el.className = `mt-3 text-sm ${colors[type] || 'text-gray-700'}`;
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    // ── Fetch & render results ────────────────────────────────────────────────
+
+    async function fetchResults() {
+      try {
+        const res  = await fetch('/results');
+        allResults = await res.json();
+        renderTable(allResults);
+        renderSummary(allResults);
+
+        // Check if any calls are still in-flight → keep auto-refresh running
+        const hasActive = allResults.some(r =>
+          ['initiated', 'ringing', 'in-progress', 'queued'].includes(r.status)
+        );
+        if (hasActive) {
+          startAutoRefresh();
+        } else {
+          stopAutoRefresh();
+        }
+      } catch (err) {
+        console.error('Failed to fetch results:', err);
+      }
+    }
+
+    function renderTable(data) {
+      const filter = document.getElementById('filter-status').value;
+      const rows   = filter ? data.filter(r => r.status === filter) : data;
+
+      document.getElementById('result-count').textContent =
+        `${rows.length} record${rows.length !== 1 ? 's' : ''}`;
+
+      const tbody = document.getElementById('results-tbody');
+
+      if (rows.length === 0) {
+        const msg = filter
+          ? `No results with status "${escHtml(filter)}".`
+          : 'No results yet — start a test run above.';
+        tbody.innerHTML =
+          `<tr id="empty-row"><td colspan="7" class="px-4 py-10 text-center text-gray-400">${msg}</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = rows.map(r => `
+        <tr class="hover:bg-gray-50 transition">
+          <td class="px-4 py-3 font-mono font-medium">${escHtml(r.to)}</td>
+          <td class="px-4 py-3">${statusBadge(r.status)}</td>
+          <td class="px-4 py-3 text-gray-500">${escHtml(fmtTime(r.startTime))}</td>
+          <td class="px-4 py-3">${escHtml(fmtDuration(r.duration))}</td>
+          <td class="px-4 py-3 text-center">${escHtml(String(r.attempts || '—'))}</td>
+          <td class="px-4 py-3">
+            ${r.testMode
+              ? '<span class="text-xs text-purple-600 font-medium">test</span>'
+              : '<span class="text-xs text-gray-400">live</span>'}
+          </td>
+          <td class="px-4 py-3 font-mono text-xs text-gray-400 truncate max-w-xs" title="${escHtml(r.callSid || '')}">${escHtml(r.callSid || '—')}</td>
+        </tr>`).join('');
+    }
+
+    function renderSummary(data) {
+      const cards = document.getElementById('summary-cards');
+      if (data.length === 0) { cards.classList.add('hidden'); return; }
+
+      const counts = data.reduce((acc, r) => {
+        acc[r.status] = (acc[r.status] || 0) + 1;
+        return acc;
+      }, {});
+
+      const ORDER  = ['completed', 'no-answer', 'busy', 'failed', 'canceled', 'initiated'];
+      const LABELS = {
+        completed: { icon: '✅', label: 'Completed',  color: 'text-green-700  bg-green-50  border-green-200' },
+        'no-answer': { icon: '📵', label: 'No Answer',  color: 'text-yellow-700 bg-yellow-50 border-yellow-200' },
+        busy:      { icon: '🔴', label: 'Busy',        color: 'text-orange-700 bg-orange-50 border-orange-200' },
+        failed:    { icon: '❌', label: 'Failed',      color: 'text-red-700    bg-red-50    border-red-200' },
+        canceled:  { icon: '🚫', label: 'Canceled',    color: 'text-gray-600   bg-gray-50   border-gray-200' },
+        initiated: { icon: '⏳', label: 'In Progress', color: 'text-blue-700   bg-blue-50   border-blue-200' },
+      };
+
+      cards.classList.remove('hidden');
+      cards.innerHTML = ORDER
+        .filter(s => counts[s])
+        .map(s => {
+          const { icon, label, color } = LABELS[s] || { icon: '•', label: s, color: 'text-gray-600 bg-gray-50 border-gray-200' };
+          return `
+            <div class="rounded-xl border p-4 flex flex-col items-center gap-1 ${color}">
+              <span class="text-2xl">${icon}</span>
+              <span class="text-2xl font-bold">${counts[s]}</span>
+              <span class="text-xs font-medium">${label}</span>
+            </div>`;
+        }).join('');
+    }
+
+    function applyFilter() {
+      renderTable(allResults);
+    }
+
+    function clearTable() {
+      allResults = [];
+      renderTable([]);
+      renderSummary([]);
+    }
+
+    // ── Auto-refresh ─────────────────────────────────────────────────────────
+
+    function startAutoRefresh() {
+      if (autoRefreshId) return;
+      document.getElementById('auto-refresh-indicator').classList.remove('hidden');
+      autoRefreshId = setInterval(fetchResults, REFRESH_MS);
+    }
+
+    function stopAutoRefresh() {
+      document.getElementById('auto-refresh-indicator').classList.add('hidden');
+      clearInterval(autoRefreshId);
+      autoRefreshId = null;
+    }
+
+    // ── Actions ───────────────────────────────────────────────────────────────
+
+    async function startTest() {
+      const btn = document.getElementById('start-btn');
+      btn.disabled = true;
+
+      try {
+        const rawNumbers  = document.getElementById('numbers-input').value.trim();
+        const numbers     = rawNumbers
+          ? rawNumbers.split('\n').map(n => n.trim()).filter(Boolean)
+          : [];
+
+        const testMode    = document.getElementById('test-mode-toggle').checked;
+        const retries     = parseInt(document.getElementById('retries-input').value, 10) || 1;
+        const scheduleVal = document.getElementById('schedule-input').value;
+        const scheduledAt = scheduleVal ? new Date(scheduleVal).toISOString() : undefined;
+
+        const body = { numbers, testMode, retries };
+        if (scheduledAt) body.scheduledAt = scheduledAt;
+
+        const res  = await fetch('/start-test', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(body),
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showStatus(`Error: ${data.error}`, 'error');
+        } else {
+          showStatus(data.message, 'success');
+          startAutoRefresh();
+        }
+      } catch (err) {
+        showStatus(`Request failed: ${err.message}`, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function exportCsv() {
+      window.location.href = '/results/export';
+    }
+  </script>
+</body>
+</html>
