@@ -36,6 +36,15 @@ jobs:
           TWILIO_NUMBER: ${{ secrets.TWILIO_NUMBER }}
         run: node call.js
 
+      - name: Notify via phone call
+        if: always()
+        env:
+          TWILIO_ACCOUNT_SID:  ${{ secrets.TWILIO_ACCOUNT_SID }}
+          TWILIO_AUTH_TOKEN:   ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_PHONE_NUMBER: ${{ secrets.TWILIO_NUMBER }}
+          MY_PHONE_NUMBER:     ${{ secrets.MY_PHONE_NUMBER }}
+        run: node tests/make-call.js
+
       - name: Upload call logs as artifact
         if: always()
         uses: actions/upload-artifact@v4
